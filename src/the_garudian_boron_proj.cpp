@@ -24,11 +24,11 @@ SerialLogHandler logHandler(LOG_LEVEL_INFO);
 
 // Digging setups
 // const int digPin = 9;
-bool isDigging = false; // check if the digging motor is already on
 // int stepsPerRevolution = 2048;
 // Stepper digStepper (stepsPerRevolution, 4, 6, 5, 7);
 // int rpm = 15;
 const int relayPin = D6;
+const int waterPin = D5;
 
 // const int ledPin = 7;  // or use a custom pin like 7
 
@@ -38,6 +38,11 @@ const unsigned long commandTimeout = 500;  // ms
 
 unsigned long lastCommandDigTime = 0;
 const unsigned long commandDigTimeout = 30000;  // ms
+bool isDigging = false; // check if the digging motor is already on
+
+unsigned long lastCommandWatTime = 0;
+const unsigned long commandWatTimeout = 30000;  // ms
+bool isWatering = false;
 
 //Declare functions
 int setLED(String command);
@@ -47,6 +52,9 @@ void stopMotors();
 void shouldDig();
 void diggingOn();
 void diggingOff();
+void shouldWater();
+void waterOn();
+void waterOff();
 
 
 // setup() runs once, when the device is first turned on
@@ -66,6 +74,9 @@ void setup() {
   // digStepper.setSpeed(rpm);
   pinMode(relayPin, OUTPUT);
   digitalWrite(relayPin, HIGH); // high is OFF, the way I wired it..?
+
+  pinMode(waterPin, OUTPUT);
+  digitalWrite(waterPin, HIGH);
 }
 
 // loop() runs over and over again, as quickly as it can execute.
@@ -121,6 +132,9 @@ void loop() {
   if (millis() - lastCommandDigTime > commandDigTimeout) {
     diggingOff();
   }
+  if (millis() - lastCommandWatTime > commandWatTimeout) {
+    waterOff();
+  }
 
   // Example: Publish event to cloud every 10 seconds. Uncomment the next 3 lines to try it!
   // Log.info("Sending Hello World to the cloud!");
@@ -169,6 +183,9 @@ int autoMove(String command) {
       Serial.println("should dig triggered");
       shouldDig();
       break;
+    case 'w':
+      shouldWater();
+      break;
     default:
       break;
   }
@@ -183,6 +200,9 @@ int manualMove(String command) {
   // perform action for 2 seconds
   if (cmd == 'd'){
     shouldDig();
+  }
+  if (cmd == 'w'){
+    shouldWater();
   }
   while(elapsedTime < 2000){
     elapsedTime = millis() - commandStart;
@@ -255,4 +275,28 @@ void diggingOff(){
    // reset timer
   // Serial.println("confirm dig off");
   // delay(2000);
+}
+
+void shouldWater(){
+  if(isWatering == false){
+    lastCommandWatTime = millis();
+    waterOn();
+    // isDigging = true;
+    Serial.println("water on");
+  }
+  else{
+    waterOff();
+    // isDigging = false;
+    Serial.println("water off");
+  }
+}
+
+void waterOn(){
+  digitalWrite(waterPin, LOW);
+  isWatering = true;
+}
+
+void waterOff(){
+  digitalWrite(waterPin, HIGH);
+  isWatering = false;
 }
