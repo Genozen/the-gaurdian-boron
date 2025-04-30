@@ -44,10 +44,17 @@ unsigned long lastCommandWatTime = 0;
 const unsigned long commandWatTimeout = 30000;  // ms
 bool isWatering = false;
 
+// For sending waypoint
+float cmd_lat = 0.00;
+float cmd_lon = 0.00;
+bool newWaypointReceived = false;
+
+//Declar Particle functions
+int manualMove(String command);
+int sendWaypoint(String command);
 //Declare functions
 int setLED(String command);
 int autoMove(String command);
-int manualMove(String command);
 void stopMotors();
 void shouldDig();
 void diggingOn();
@@ -64,6 +71,7 @@ void setup() {
   motorSerial.begin(9600); //Use hardware Serial1 for motors
   // Particle.function("setLED", setLED);
   Particle.function("Command Movement", manualMove);
+  Particle.function("Send Waypoint", sendWaypoint);
 
   stopMotors(); // ensure motor is stop
 
@@ -81,7 +89,23 @@ void setup() {
 
 // loop() runs over and over again, as quickly as it can execute.
 void loop() {
-  // The core of your code will likely live here.
+
+  // Send out the lat lon form the USER to the Jetson
+  if(newWaypointReceived){
+    Serial.print("^"); // Start marker
+
+    Serial.print("{\"lat\":");
+    Serial.print(cmd_lat, 6);
+    Serial.print(",\"lon\":");
+    Serial.print(cmd_lon, 6);
+    Serial.print("}");
+
+    Serial.println("$"); // End marker with newline
+
+    newWaypointReceived = false;
+  }
+
+  // When Serial receives something
   if (Serial.available()) {
     char cmd = Serial.read();
     lastCommandTime = millis(); //reset heartbeat timer
@@ -91,6 +115,7 @@ void loop() {
     // digitalWrite(ledPin, LOW);
 
     autoMove(String(cmd));
+
     // switch (cmd) {
     //   case 'f':
     //     // motor forward logic
@@ -142,6 +167,23 @@ void loop() {
   // delay( 10 * 1000 ); // milliseconds and blocking - see docs for more info!
 }
 
+// Example to send "41.8781,-87.6298"
+int sendWaypoint(String command){
+  int commandIdx = command.indexOf(",");
+  if (commandIdx == -1) {
+    return -1;
+  }
+
+  String latStr = command.substring(0, commandIdx);
+  String lonStr = command.substring(commandIdx + 1);
+
+  cmd_lat = latStr.toFloat();
+  cmd_lon = lonStr.toFloat();
+  newWaypointReceived = true;
+
+  return 1; // success
+}
+
 int setLED(String command) {
   if (command == "on") {
     digitalWrite(D7, HIGH);
@@ -153,44 +195,6 @@ int setLED(String command) {
   return -1;
 }
 
-int autoMove(String command) {
-  char cmd = command.charAt(0);
-  switch (cmd) {
-    case 'f':
-      // motor forward logic
-      motorSerial.write(127); // M1, Forward
-      motorSerial.write(255); // M2, Forward
-      break;
-    case 'b':
-      // motor backward logic
-      motorSerial.write(1); // M1, Reverse
-      motorSerial.write(128); // M2, Reverse
-      break;
-    case 'l':
-      // left turn logic
-      motorSerial.write(1); // M1, Reverse
-      motorSerial.write(255); // M2, Forward
-      break;
-    case 'r':
-      // right turn logic
-      motorSerial.write(127); // M1, Forward
-      motorSerial.write(128); // M2, Reverse
-      break;
-    case 's':
-      stopMotors();
-      break;
-    case 'd':
-      Serial.println("should dig triggered");
-      shouldDig();
-      break;
-    case 'w':
-      shouldWater();
-      break;
-    default:
-      break;
-  }
-  return 0;
-}
 
 int manualMove(String command) {
   unsigned long commandStart = millis();
@@ -237,6 +241,45 @@ int manualMove(String command) {
       default:
         break;
     }
+  }
+  return 0;
+}
+
+int autoMove(String command) {
+  char cmd = command.charAt(0);
+  switch (cmd) {
+    case 'f':
+      // motor forward logic
+      motorSerial.write(127); // M1, Forward
+      motorSerial.write(255); // M2, Forward
+      break;
+    case 'b':
+      // motor backward logic
+      motorSerial.write(1); // M1, Reverse
+      motorSerial.write(128); // M2, Reverse
+      break;
+    case 'l':
+      // left turn logic
+      motorSerial.write(1); // M1, Reverse
+      motorSerial.write(255); // M2, Forward
+      break;
+    case 'r':
+      // right turn logic
+      motorSerial.write(127); // M1, Forward
+      motorSerial.write(128); // M2, Reverse
+      break;
+    case 's':
+      stopMotors();
+      break;
+    case 'd':
+      Serial.println("should dig triggered");
+      shouldDig();
+      break;
+    case 'w':
+      shouldWater();
+      break;
+    default:
+      break;
   }
   return 0;
 }
